@@ -12,9 +12,56 @@
 
 import UIKit
 
-class CoinsListWorker
-{
-  func doSomeWork()
-  {
-  }
+class CoinsListWorker {
+    
+    private let dataProvider: CoinListDataProvider?
+    private var completion: ((Result<[CoinModel]?, CryptocurrenciesError>) -> Void)?
+    
+    init(dataProvider: CoinListDataProvider = CoinListDataProvider(coinsStore: CoinStore())) {
+        self.dataProvider = dataProvider
+        self.dataProvider?.delegate = self
+    }
+    
+    func doFetchListCoins(baseCoin: String,
+                          orderBy: String,
+                          top: Int,
+                          percentagePrice: String,
+                          completion: @escaping (Result<[CoinModel]?, CryptocurrenciesError>) -> Void) {
+        self.completion = completion
+        dataProvider?.fetchListCoins(by: baseCoin,
+                                     with: nil,
+                                     orderBy: orderBy,
+                                     total: top,
+                                     page: 1,
+                                     percentagePrice: percentagePrice)
+    }
+}
+
+// MARK: - ListCoinDataProviderDelegate
+extension CoinsListWorker: CoinListDataProviderDelegate {
+    
+    func success(model: Any) {
+        guard let completion = completion else {
+            fatalError("Completion not implemented!")
+        }
+        completion(.success(model as? [CoinModel]))
+    }
+    
+    func errorData(_ provider: GenericDataProviderDelegate?, error: Error) {
+        guard let completion = completion else {
+            fatalError("Completion not implemented!")
+        }
+        
+        let nsError = error as NSError
+        switch nsError.code {
+        case 500:
+            completion(.failure(.internalServerError))
+        case 400:
+            completion(.failure(.badRequestError))
+        case 404:
+            completion(.failure(.notFoundError))
+        default:
+            completion(.failure(.undefinedError))
+        }
+    }
 }
